@@ -3,13 +3,14 @@ package main
 import (
 	"bytes"
 	"fmt"
-	"github.com/TregubovMY/stegography/stegify_methods/lsb"
 	"image"
 	"image/color"
 	"image/png"
 	"io"
 	"log"
 	"os"
+
+	"github.com/TregubovMY/stegography/stegify_methods/lsb"
 )
 
 func main() {
@@ -42,10 +43,21 @@ func main() {
 	}
 	defer encoded.Close()
 
-	err = lsb.Encode(carrier, data, encoded)
+	carrierData, err1 := io.ReadAll(carrier)
+	dataData, err2 := io.ReadAll(data)
+	if err1 != nil || err2 != nil {
+		log.Fatalf("Ошибка при чтении данных: %v %v", err1, err2)
+	}
+	encodedData, err := lsb.Encode(carrierData, dataData)
 	if err != nil {
 		log.Fatalf("Ошибка при кодировании данных: %v", err)
 	}
+
+	_, err = encoded.Write(encodedData)
+	if err != nil {
+		log.Fatalf("Ошибка при записи закодированных данных: %v", err)
+	}
+
 	fmt.Println("Данные успешно закодированы в изображение:", encodedFile)
 
 	encodedImage, err := os.Open(encodedFile)
@@ -56,14 +68,18 @@ func main() {
 
 	// Буфер для хранения раскодированных данных
 	decodedData := new(bytes.Buffer)
+	encodedImageData, err := io.ReadAll(encodedImage)
+	if err != nil {
+		log.Fatalf("Ошибка при чтении данных: %v", err)
+	}
 
-	err = lsb.Decode(encodedImage, decodedData)
+	decodedFromEncoded, err := lsb.Decode(encodedImageData)
 	if err != nil {
 		log.Fatalf("Ошибка при декодировании данных: %v", err)
 	}
 	fmt.Println("Данные успешно декодированы из изображения")
 
-	err = os.WriteFile(decodedDataFile, decodedData.Bytes(), 0644)
+	err = os.WriteFile(decodedDataFile, decodedFromEncoded, 0644)
 	if err != nil {
 		log.Fatalf("Ошибка при сохранении декодированных данных: %v", err)
 	}
