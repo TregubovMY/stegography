@@ -1,20 +1,25 @@
 package lsb
 
 import (
+	"bytes"
 	"encoding/binary"
 	"fmt"
-	"github.com/TregubovMY/stegography/bitmanip"
-	"github.com/TregubovMY/stegography/utils"
 	"image"
 	"io"
+
+	"github.com/TregubovMY/stegography/bitmanip"
+	"github.com/TregubovMY/stegography/utils"
 )
 
 // Decode выполняет стеганографическое декодирование считывателя
 // с ранее закодированными данными с помощью функции Encode и записывает результат в io.Writer.
-func Decode(carrier io.Reader, result io.Writer) error {
+
+//export Decode
+func Decode(c []byte) ([]byte, error) {
+	carrier := io.NopCloser(bytes.NewReader(c))
 	RGBAImage, _, err := utils.GetImageAsRGBA(carrier)
 	if err != nil {
-		return fmt.Errorf("ошибка парсинга контейнера данных: %v", err)
+		return nil, fmt.Errorf("ошибка парсинга контейнера данных: %v", err)
 	}
 
 	width := RGBAImage.Bounds().Dx()
@@ -54,11 +59,11 @@ func Decode(carrier io.Reader, result io.Writer) error {
 		resultBytes = append(resultBytes, bitmanip.ConstructByteOfQuartersAsSlice(dataBytes[i:i+4]))
 	}
 
-	if _, err = result.Write(resultBytes); err != nil {
-		return err
-	}
+	// if _, err = result.Write(resultBytes); err != nil {
+	// 	return nil, err
+	// }
 
-	return nil
+	return resultBytes, nil
 }
 
 func align(dataBytes []byte) []byte {
@@ -104,3 +109,9 @@ func extractDataCount(RGBAImage *image.RGBA) int {
 
 	return int(binary.LittleEndian.Uint32(bs))
 }
+
+// func Sum(a, b int) int { return a + b }
+
+// func MyFoo(data []byte) int { return len(data) }
+
+// func MyFooErr(data []byte) (int, error) { return len(data), nil }

@@ -1,22 +1,28 @@
 package lsb
 
 import (
+	"bytes"
 	"fmt"
-	"github.com/TregubovMY/stegography/bitmanip"
-	"github.com/TregubovMY/stegography/utils"
 	"image"
 	_ "image/jpeg" //register jpeg image format
 	"image/png"
 	"io"
+
+	"github.com/TregubovMY/stegography/bitmanip"
+	"github.com/TregubovMY/stegography/utils"
 )
 
 // 20 байт выделены для заголовка размера данных
 const dataSizeHeaderReservedBytes = 20
 
-func Encode(carrier io.Reader, data io.Reader, result io.Writer) error {
+//export Encode
+func Encode(c []byte, d []byte) ([]byte, error) {
+	carrier := io.NopCloser(bytes.NewReader(c))
+	data := io.NopCloser(bytes.NewReader(d))
+
 	RGBAImage, format, err := utils.GetImageAsRGBA(carrier)
 	if err != nil {
-		return fmt.Errorf("ошибка при парсинге изображения-контейнера: %v", err)
+		return nil, fmt.Errorf("ошибка при парсинге изображения-контейнера: %v", err)
 	}
 
 	dataBytes := make(chan byte, 128)
@@ -41,21 +47,21 @@ func Encode(carrier io.Reader, data io.Reader, result io.Writer) error {
 				c := RGBAImage.RGBAAt(x, y)
 				hasMoreBytes, err = utils.SetColorSegment(&c.R, dataBytes, errChan)
 				if err != nil {
-					return err
+					return nil, err
 				}
 				if hasMoreBytes {
 					totalNumberBytes++
 				}
 				hasMoreBytes, err = utils.SetColorSegment(&c.G, dataBytes, errChan)
 				if err != nil {
-					return err
+					return nil, err
 				}
 				if hasMoreBytes {
 					totalNumberBytes++
 				}
 				hasMoreBytes, err = utils.SetColorSegment(&c.B, dataBytes, errChan)
 				if err != nil {
-					return err
+					return nil, err
 				}
 				if hasMoreBytes {
 					totalNumberBytes++
@@ -68,7 +74,7 @@ func Encode(carrier io.Reader, data io.Reader, result io.Writer) error {
 	select {
 	case _, ok := <-dataBytes:
 		if ok {
-			return fmt.Errorf("файл данных слишком велик для этого контейнера")
+			return nil, fmt.Errorf("файл данных слишком велик для этого контейнера")
 		}
 	default:
 	}
@@ -77,9 +83,15 @@ func Encode(carrier io.Reader, data io.Reader, result io.Writer) error {
 
 	switch format {
 	case "png", "jpeg":
-		return png.Encode(result, RGBAImage)
+		result := new(bytes.Buffer)
+		err := png.Encode(result, RGBAImage)
+		if err != nil {
+			return nil, err
+		}
+		return result.Bytes(), nil
+
 	default:
-		return fmt.Errorf("неподдерживаемый формат контейнера")
+		return nil, fmt.Errorf("неподдерживаемый формат контейнера")
 	}
 }
 
